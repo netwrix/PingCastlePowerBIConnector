@@ -41,7 +41,9 @@ PingCastleEntepriseType = type function (
 
 Test = (url as text)  => 
     let
-        t=PingCastleEnteprise.CallAPIAllDomains(url, "Reports")
+        t = CallFunction(url, "GetReport", 26617)
+        //t = GetEntity(url, "Report")
+        //t=PingCastleEnteprise.CallAPIAllDomains(url, "Reports")
         in
             t;
 
@@ -61,6 +63,39 @@ ActionPlanType = type table [
     flags = number, 
     isInUse = logical, 
     status = text
+];
+
+AADActionPlanType = type table [
+    id = number, 
+    aadid = number, 
+    riskID = text, 
+    creator = text, 
+    creationDate = datetime, 
+    updator = text, 
+    updateDate = datetime, 
+    expectedDate = datetime, 
+    specificItem = text, 
+    priority = text, 
+    personInCharge = text, 
+    comment = text, 
+    flags = number, 
+    isInUse = logical, 
+    status = text
+];
+
+AzureADType = type table [
+    id = number,
+    ownerID = number, 
+    name = text, 
+    tenantID = text, 
+    status = text, 
+    lastReportID = number, 
+    firstReportID = number, 
+    numberOfReport = number, 
+    comment = text, 
+    creationDate = datetime, 
+    discoveredDate = datetime, 
+    flags = number
 ];
 
 DomainType = type table [
@@ -99,6 +134,23 @@ AnomalyExceptionType = type table [
     status = text
 ];
 
+AADAnomalyExceptionType = type table [
+    id = number,
+    aadid = number,
+    domain = text,
+    riskID = text,
+    creator = text,
+    creationDate = datetime,
+    updator = text,
+    updateDate = datetime,
+    specificItem = text,
+    startDate = datetime,
+    endDate = datetime,
+    comment = text,
+    flags = number,
+    isInUse = logical,
+    status = text
+];
 
 OwnerType = type table [
     id = number,
@@ -178,6 +230,28 @@ ReportType = type table [
     ruleML5 = number
     ];
 
+AADReportType = type table [
+    id = number,
+    aadid = number,
+    agentID = number,
+    generation = datetime,
+    importedDate = datetime,
+    importedBy = text,
+    agentVersion = text,
+    reportDetailLevel = text,
+    globalScore = number,
+    staleObjectsScore = number,
+    privilegiedGroupScore = number,
+    trustScore = number,
+    anomalyScore = number,
+    maturityLevel = number,
+    ruleML1 = number,
+    ruleML2 = number,
+    ruleML3 = number,
+    ruleML4 = number,
+    ruleML5 = number
+    ];
+
 EventType= type table [
     id = number,
     domainID = number,
@@ -186,20 +260,41 @@ EventType= type table [
     riskId = text,
     referenceDomainID = number,
     referenceAADID = number,
-    referenceAzureAD = number,
+    identity = text
+];
+
+AADEventType= type table [
+    id = number,
+    aadid = number,
+    date = datetime,
+    eventType = text,
+    riskId = text,
+    referenceDomainID = number,
+    referenceAADID = number,
     identity = text
 ];
 
 SchemaTable = #table({"Entity", "Type", "ApiEndpoint"}, {
-    {"Domains", DomainType , "Domains"},    
+    {"Domains", DomainType , "Domains"},
     {"ActionPlans", ActionPlanType, "ActionPlan" },
     {"AnomalyExceptions", AnomalyExceptionType, "AnomalyException" },
     {"Owners", OwnerType, "Owners" },
     {"TrustExceptions", TrustExceptionType, "TrustException" },
     {"Rules", RuleType, "Rules" },
     {"RulesMatched", RulesMatchedType, "Rules/RulesMatched" },
-    {"Events" , EventType, "Domains/{domainId}/Events"},
-    {"Reports" , ReportType, "Domains/{domainId}/Reports"}
+    {"Events" , EventType, "Events"},
+    {"Reports" , ReportType, "Reports"},
+    {"LastReports" , ReportType, "Reports/OnlyLastReports"},
+
+    {"AADActionPlans", AADActionPlanType , "AADActionPlan"},
+    {"AADAnomalyExceptions", AADAnomalyExceptionType , "AADAnomalyException"},
+    {"AADEvents", AADEventType , "AADEvents"},
+    {"AADReports", AADReportType , "AADReports"},
+    {"LastAADReports", AADReportType , "AADReports/OnlyLastReports"},
+    {"AzureADs", AzureADType , "AzureADs"},
+
+    {"GetReport", 0 , "Reports/{id}"},
+    {"GetAADReport", 0 , "AADReports/{id}"}
 });
 
 GetSchemaForEntity = (entity as text) as type => try SchemaTable{[Entity=entity]}[Type] otherwise error "Couldn't find entity: '" & entity &"'";
@@ -212,10 +307,12 @@ PingCastleEntepriseNavTable = (url as text) as table =>
         entities = Table.SelectColumns(SchemaTable, {"Entity"}),
         rename = Table.RenameColumns(entities, {{"Entity", "Name"}}),
         // Add Data as a calculated column
-        withData = Table.AddColumn(rename, "Data", each GetEntity(url, [Name]), type table),
+        withData = Table.AddColumn(rename, "Data", 
+                        each if not Text.Contains(GetEndPointForEntity([Name]), "{id}") then GetEntity(url, [Name]) else (id as number) => CallFunction(url, [Name], id), 
+                        type table),
         // Add ItemKind and ItemName as fixed text values
-        withItemKind = Table.AddColumn(withData, "ItemKind", each "Table", type text),
-        withItemName = Table.AddColumn(withItemKind, "ItemName", each "Table", type text),
+        withItemKind = Table.AddColumn(withData, "ItemKind", each if not Text.Contains(GetEndPointForEntity([Name]), "{id}") then "Table" else "Function", type text),
+        withItemName = Table.AddColumn(withItemKind, "ItemName", each if not Text.Contains(GetEndPointForEntity([Name]), "{id}") then "Table" else "Function", type text),
         // Indicate that the node should not be expandable
         withIsLeaf = Table.AddColumn(withItemName, "IsLeaf", each true, type logical),
         // Generate the nav table
@@ -227,24 +324,18 @@ PingCastleEntepriseNavTable = (url as text) as table =>
 GetEntity = (url as text, entity as text) as table => 
     let
         endpoint = GetEndPointForEntity(entity),
-        result = if Text.Contains(endpoint, "{domainId}") then  PingCastleEnteprise.CallAPIAllDomains(url, entity) else PingCastleEnteprise.CallAPI(url, endpoint),
+        result = PingCastleEnteprise.CallAPI(url, endpoint),
         schema = GetSchemaForEntity(entity),
         appliedSchema = Table.ChangeType(result, schema)
     in
         appliedSchema;
 
-PingCastleEnteprise.CallAPIAllDomains = (url as text, entity as text) => //as table => 
-    let 
-        headers = PingCastleEnteprise.Login(url),
-        allDomains = PingCastleEnteprise.CallAPI(url, "Domains", headers),
+CallFunction = (url as text, entity as text, id as number) => //as table => 
+    let
         endpoint = GetEndPointForEntity(entity),
-        allEndpoints = List.Transform(allDomains, each Text.Replace(endpoint,"{domainId}",  Text.From(_[id] ))),
-        result = List.Combine(List.Transform(allEndpoints, each PingCastleEnteprise.CallAPI(url,  _, headers))),
-        schema = GetSchemaForEntity(entity),
-        appliedSchema = Table.ChangeType(result, schema)
+        result = PingCastleEnteprise.CallAPI(url, Text.Replace(endpoint,"{id}",  Text.From(id )))
     in
-        appliedSchema;
-
+        result;
 
 PingCastleEnteprise.CallAPI = (url  as text, endpoint as text, optional headers) =>
     let
