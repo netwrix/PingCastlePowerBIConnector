@@ -41,8 +41,8 @@ PingCastleEntepriseType = type function (
 
 Test = (url as text)  => 
     let
-        t = CallFunction(url, "GetReport", 26617)
-        //t = GetEntity(url, "Report")
+        //t = CallFunction(url, "GetReport", 26617)
+        t = GetEntity(url, "KPIHistory")
         //t=PingCastleEnteprise.CallAPIAllDomains(url, "Reports")
         in
             t;
@@ -274,6 +274,32 @@ AADEventType= type table [
     identity = text
 ];
 
+KPIHistoryType = type table [
+    id = number,
+    day = datetime,
+    ownerID = number,
+    kpI111Measure = number,
+    kpI112Measure = number,
+    kpI113Measure = number,
+    kpI114Measure = number,
+    kpI121Measure = number,
+    kpI122Measure = number,
+    kpI123Measure = number,
+    kpI124Measure = number,
+    kpI131Measure = number,
+    kpI132Measure = number,
+    kpI133Measure = number,
+    kpI134Measure = number,
+    kpI211Measure = number,
+    kpI212Measure = number,
+    kpI213Measure = number,
+    kpI214Measure = number,
+    kpI221Measure = number,
+    kpI222Measure = number,
+    kpI223Measure = number,
+    kpI224Measure = number
+];
+
 SchemaTable = #table({"Entity", "Type", "ApiEndpoint"}, {
     {"Domains", DomainType , "Domains"},
     {"ActionPlans", ActionPlanType, "ActionPlan" },
@@ -292,6 +318,7 @@ SchemaTable = #table({"Entity", "Type", "ApiEndpoint"}, {
     {"AADReports", AADReportType , "AADReports"},
     {"LastAADReports", AADReportType , "AADReports/OnlyLastReports"},
     {"AzureADs", AzureADType , "AzureADs"},
+    {"KPIHistory", KPIHistoryType , "KPIHistory"},
 
     {"GetReport", 0 , "Reports/{id}"},
     {"GetAADReport", 0 , "AADReports/{id}"}
