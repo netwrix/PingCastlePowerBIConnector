@@ -11,7 +11,7 @@ Note: if this directory doesn't exist, you have to create it
 
 2. Open Power BI Desktop
 
-Note, to load extensions without whitelisting the extesion, you will need to lower the security level for extensions in Power BI Desktop to enable loading unsigned/uncertified connectors.
+Note, to load extensions without allowlisting the extension, you will need to lower the security level for extensions in Power BI Desktop to enable loading unsigned/uncertified connectors.
 See below.
 
 3. Go to File | Options and settings | Options
